@@ -3,7 +3,9 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-from google.cloud import storage
+from airflow.hooks.base_hook import BaseHook
+from operators.bigquery_operator import BigQueryOperator
+
 
 default_args = {
     'owner': 'airflow',
@@ -23,20 +25,34 @@ dag = DAG(
 )
 
 def get_spotify_data():
+
+    conn = BaseHook.get_connection('spotify_conn')
+    spotify_client_id = conn.login
+    spotify_client_secret = conn.password
+    
     client_credentials_manager = SpotifyClientCredentials(
-        client_id='your_client_id',
-        client_secret='your_client_secret',
+        client_id=spotify_client_id,
+        client_secret=spotify_client_secret,
     )
+
     sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
-    # Call Spotify API to get your data
-    # ...
+    results = sp.search(q='artist:Ed Sheeran', type='track', limit=10)
+    for track in results['tracks']['items']:
+        print(track['name'])
 
 def upload_to_gcs():
-    client = storage.Client()
-    bucket = client.get_bucket('your_bucket_name')
-    blob = bucket.blob('your_filename.csv')
+    # client = storage.Client()
+    # bucket = client.get_bucket('your_bucket_name')
+    # blob = bucket.blob('your_filename.csv')
     # Upload data to Google Storage
     # ...
+    print("do nothing for now")
+
+    data = [
+        {'column1': 'value1', 'column2': 1},
+        {'column1': 'value3', 'column2': 3},
+    ]
+    return BigQueryOperator(data)
 
 with dag:
     t1 = PythonOperator(
@@ -44,9 +60,12 @@ with dag:
         python_callable=get_spotify_data,
     )
 
-    t2 = PythonOperator(
+    t2 = BigQueryOperator(
         task_id='upload_to_gcs',
-        python_callable=upload_to_gcs,
+        data = [
+            {'column1': 'value1', 'column2': 1},
+            {'column1': 'value3', 'column2': 3},
+        ]
     )
 
     t1 >> t2
