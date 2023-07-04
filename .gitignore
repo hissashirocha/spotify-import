@@ -1,3 +1,4 @@
 **/logs
 *.log
 dags/__pycache__/
+operators/__pycache__/
